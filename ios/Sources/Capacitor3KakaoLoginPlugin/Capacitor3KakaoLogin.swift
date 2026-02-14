@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 
+import KakaoSDKAuth
 import KakaoSDKUser
 import KakaoSDKCommon
 import KakaoSDKShare
@@ -11,36 +12,22 @@ import KakaoSDKTemplate
     @objc public func kakaoLogin(_ call: CAPPluginCall) -> Void {
         
         // 카카오톡 설치 여부 확인
-        if (UserApi.isKakaoTalkLoginAvailable()) {
-            UserApi.shared.loginWithKakaoTalk {(oauthToken, error) in
-                if let error = error {
-                    print(error)
-                    call.reject("error")
-                }
-                else {
-
-                    call.resolve([
-                        "value": oauthToken?.accessToken ?? ""
-                    ])
-                    
-                }
+        let handleResult: (OAuthToken?, Error?) -> Void = { oauthToken, error in
+            if let error = error {
+                call.reject(error.localizedDescription, nil, error)
+                return
             }
+            call.resolve([
+                "accessToken": oauthToken?.accessToken ?? "",
+                "idToken": oauthToken?.idToken ?? "",
+                "refreshToken": oauthToken?.refreshToken ?? "",
+            ])
         }
-        else{
-            
-            UserApi.shared.loginWithKakaoAccount {(oauthToken, error) in
-                    if let error = error {
-                        print(error)
-                        call.reject("error")
-                    }
-                    else {
 
-                        call.resolve([
-                            "value": oauthToken?.accessToken ?? ""
-                        ])
-                    }
-                }
-            
+        if (UserApi.isKakaoTalkLoginAvailable()) {
+            UserApi.shared.loginWithKakaoTalk(completion: handleResult)
+        } else {
+            UserApi.shared.loginWithKakaoAccount(completion: handleResult)
         }
     }
     
