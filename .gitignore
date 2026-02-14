@@ -61,3 +61,4 @@ captures
 .externalNativeBuild
 
 .build/
+Package.resolved
