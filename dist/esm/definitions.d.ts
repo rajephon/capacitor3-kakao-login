@@ -1,3 +1,8 @@
+export interface KakaoLoginResult {
+    accessToken: string;
+    idToken: string;
+    refreshToken: string;
+}
 export interface Capacitor3KakaoLoginPlugin {
     initializeKakao(options: {
         app_key: string;
@@ -8,7 +13,7 @@ export interface Capacitor3KakaoLoginPlugin {
     kakaoLogin(options?: {
         redirectUri?: string;
         webSdkVersion?: 'v1' | 'v2';
-    }): Promise<{
+    }): Promise<KakaoLoginResult | {
         value: string;
     }>;
     handleKakaoCallback(): Promise<{
