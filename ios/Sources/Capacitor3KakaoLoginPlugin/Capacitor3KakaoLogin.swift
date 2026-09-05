@@ -14,6 +14,14 @@ import KakaoSDKTemplate
         // 카카오톡 설치 여부 확인
         let handleResult: (OAuthToken?, Error?) -> Void = { oauthToken, error in
             if let error = error {
+                // 사용자 취소는 코드로 구분한다. SdkError 는 LocalizedError 를 채택하지 않아
+                // localizedDescription 이 "…SdkError error 0." 뿐이라 JS 가 문구로는 취소를 식별할 수 없다
+                // (Capacitor 브리지는 3번째 인자 error 객체를 JS 로 넘기지 않는다).
+                if let sdkError = error as? SdkError,
+                   case .ClientFailed(reason: .Cancelled, errorMessage: _) = sdkError {
+                    call.reject(error.localizedDescription, "SIGN_IN_CANCELLED", error)
+                    return
+                }
                 call.reject(error.localizedDescription, nil, error)
                 return
             }
