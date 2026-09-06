@@ -9,6 +9,20 @@ import KakaoSDKTemplate
 
 
 @objc public class Capacitor3KakaoLogin: NSObject {
+    /// 사용자 취소로 취급할 SdkError 두 갈래.
+    /// - ClientFailed(.Cancelled): 간편로그인 "취소" 버튼(error=cancelled), ASWebAuthenticationSession 닫기, 카카오톡 실행 실패
+    /// - AuthFailed(.AccessDenied): 동의 화면에서 "취소"(error=access_denied) — SDK 주석: "사용자가 동의 화면에서 카카오 로그인을 취소한 경우"
+    ///   첫 로그인·연결 끊기 후 재로그인이 모두 동의 화면을 거치므로 실제로는 이쪽이 더 흔하다.
+    static func isUserCancellation(_ error: SdkError) -> Bool {
+        switch error {
+        case .ClientFailed(reason: .Cancelled, errorMessage: _),
+             .AuthFailed(reason: .AccessDenied, errorInfo: _):
+            return true
+        default:
+            return false
+        }
+    }
+
     @objc public func kakaoLogin(_ call: CAPPluginCall) -> Void {
         
         // 카카오톡 설치 여부 확인
@@ -17,8 +31,7 @@ import KakaoSDKTemplate
                 // 사용자 취소는 코드로 구분한다. SdkError 는 LocalizedError 를 채택하지 않아
                 // localizedDescription 이 "…SdkError error 0." 뿐이라 JS 가 문구로는 취소를 식별할 수 없다
                 // (Capacitor 브리지는 3번째 인자 error 객체를 JS 로 넘기지 않는다).
-                if let sdkError = error as? SdkError,
-                   case .ClientFailed(reason: .Cancelled, errorMessage: _) = sdkError {
+                if let sdkError = error as? SdkError, Capacitor3KakaoLogin.isUserCancellation(sdkError) {
                     call.reject(error.localizedDescription, "SIGN_IN_CANCELLED", error)
                     return
                 }
