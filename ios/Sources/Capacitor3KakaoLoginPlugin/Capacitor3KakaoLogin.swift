@@ -10,7 +10,8 @@ import KakaoSDKTemplate
 
 @objc public class Capacitor3KakaoLogin: NSObject {
     /// 사용자 취소로 취급할 SdkError 두 갈래.
-    /// - ClientFailed(.Cancelled): 간편로그인 "취소" 버튼(error=cancelled), ASWebAuthenticationSession 닫기, 카카오톡 실행 실패
+    /// - ClientFailed(.Cancelled): 간편로그인 "취소" 버튼(error=cancelled), ASWebAuthenticationSession 닫기
+    ///   (카카오톡 실행 실패는 .NotSupported 라 취소가 아닌 일반 실패로 남는다 — 의도된 동작)
     /// - AuthFailed(.AccessDenied): 동의 화면에서 "취소"(error=access_denied) — SDK 주석: "사용자가 동의 화면에서 카카오 로그인을 취소한 경우"
     ///   첫 로그인·연결 끊기 후 재로그인이 모두 동의 화면을 거치므로 실제로는 이쪽이 더 흔하다.
     static func isUserCancellation(_ error: SdkError) -> Bool {
