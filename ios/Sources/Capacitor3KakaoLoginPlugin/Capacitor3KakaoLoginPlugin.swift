@@ -42,6 +42,12 @@ public class Capacitor3KakaoLoginPlugin: CAPPlugin, CAPBridgedPlugin {
     //
     // 모든 접근은 메인 큐다 — 알림은 메인에서 오고 `kakaoLogin` 도 메인으로 디스패치한다.
 
+    /// 백스톱이 정리한 로그인의 에러 코드. 사용자가 시트에서 직접 누른 취소(`SIGN_IN_CANCELLED`)와
+    /// **구분되어야 한다** — 호출측이 둘을 같은 코드로 받으면 "콜백이 유실됐다"와 "사용자가 취소했다"를
+    /// 나눌 수 없어, 백스톱이 실제로 동작하는지 계측할 방법이 사라진다. 조용히 무시해야 하는 성격은
+    /// 같으므로 호출측은 둘 다 취소로 취급하면 된다.
+    private static let abandonedErrorCode = "SIGN_IN_ABANDONED"
+
     /// 진행 중인 `kakaoLogin` 호출. 결과가 정상 도착하면 즉시 비운다.
     private var pendingLoginCall: CAPPluginCall?
     /// 이번 로그인이 실제로 백그라운드를 다녀왔는가. 제어센터·알림센터·전화 수신 복귀는
@@ -90,7 +96,7 @@ public class Capacitor3KakaoLoginPlugin: CAPPlugin, CAPBridgedPlugin {
         // 살려 두면 나중에 도착한 옛 리다이렉트가 토큰 교환을 돌려 **이미 reject 된 call 에 resolve** 를
         // 건다. nil 로 만들면 handleOpenUrl 이 false 를 반환해 URL 이 조용히 버려진다(재탭으로 복구).
         AuthController.shared.authorizeWithTalkCompletionHandler = nil
-        call.reject("Kakao login was abandoned without a redirect callback.", "SIGN_IN_CANCELLED")
+        call.reject("Kakao login was abandoned without a redirect callback.", Self.abandonedErrorCode)
     }
 
     private func clearPendingLogin() {
@@ -113,7 +119,7 @@ public class Capacitor3KakaoLoginPlugin: CAPPlugin, CAPBridgedPlugin {
             // 남아 — 지금 고치려는 결함과 같은 부류가 그대로 남는다.
             if let stale = self.pendingLoginCall {
                 self.clearPendingLogin()
-                stale.reject("Kakao login was superseded by a new attempt.", "SIGN_IN_CANCELLED")
+                stale.reject("Kakao login was superseded by a new attempt.", Self.abandonedErrorCode)
             }
 
             // 분기는 여기서 한 번만 판정해 implementation 에 넘긴다 — 양쪽에서 각각 물으면 그 사이에
