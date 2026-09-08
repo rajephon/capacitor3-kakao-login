@@ -24,10 +24,16 @@ import KakaoSDKTemplate
         }
     }
 
-    @objc public func kakaoLogin(_ call: CAPPluginCall) -> Void {
-        
-        // 카카오톡 설치 여부 확인
+    /// - Parameters:
+    ///   - useTalk: 카카오톡 전환 분기를 쓸지. 호출부(플러그인)가 이미 판정한 값을 받는다 — 여기서 다시
+    ///     `isKakaoTalkLoginAvailable()` 을 물으면 그 사이 가용성이 바뀔 때 백스톱의 판단 근거(saju.ai#24)와
+    ///     실제 분기가 어긋난다.
+    ///   - onSettled: 결과가 도착했음을 알린다. 플러그인이 보관 중인 `CAPPluginCall` 을 놓아주는 신호이며,
+    ///     완료 핸들러가 영영 호출되지 않는 경우에는 당연히 불리지 않는다 — 그게 백스톱이 잡는 상황이다.
+    @objc public func kakaoLogin(_ call: CAPPluginCall, useTalk: Bool, onSettled: @escaping () -> Void) -> Void {
+
         let handleResult: (OAuthToken?, Error?) -> Void = { oauthToken, error in
+            onSettled()
             if let error = error {
                 // 사용자 취소는 코드로 구분한다. SdkError 는 LocalizedError 를 채택하지 않아
                 // localizedDescription 이 "…SdkError error 0." 뿐이라 JS 가 문구로는 취소를 식별할 수 없다
@@ -46,7 +52,7 @@ import KakaoSDKTemplate
             ])
         }
 
-        if (UserApi.isKakaoTalkLoginAvailable()) {
+        if useTalk {
             UserApi.shared.loginWithKakaoTalk(completion: handleResult)
         } else {
             UserApi.shared.loginWithKakaoAccount(completion: handleResult)
