@@ -6,7 +6,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.kakao.sdk.auth.model.OAuthToken;
 import com.kakao.sdk.common.KakaoSdk;
+import com.kakao.sdk.common.model.AuthError;
+import com.kakao.sdk.common.model.AuthErrorCause;
+import com.kakao.sdk.common.model.ClientError;
+import com.kakao.sdk.common.model.ClientErrorCause;
 import com.kakao.sdk.share.ShareClient;
 import com.kakao.sdk.template.model.Button;
 import com.kakao.sdk.template.model.Content;
@@ -14,6 +19,8 @@ import com.kakao.sdk.template.model.FeedTemplate;
 import com.kakao.sdk.template.model.Link;
 import com.kakao.sdk.user.UserApiClient;
 import java.util.ArrayList;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function2;
 
 public class Capacitor3KakaoLogin {
 
@@ -24,47 +31,45 @@ public class Capacitor3KakaoLogin {
         this.activity = activity;
     }
 
+    /**
+     * 사용자 취소로 취급할 에러 두 갈래 — iOS `isUserCancellation` 과 같은 기준.
+     * - ClientError(Cancelled): 간편로그인 "취소", 카카오톡·Custom Tabs 에서 뒤로가기
+     * - AuthError(AccessDenied): 동의 화면에서 "취소"(error=access_denied)
+     */
+    static boolean isUserCancellation(Throwable error) {
+        if (error instanceof ClientError) {
+            return ((ClientError) error).getReason() == ClientErrorCause.Cancelled;
+        }
+        if (error instanceof AuthError) {
+            return ((AuthError) error).getReason() == AuthErrorCause.AccessDenied;
+        }
+        return false;
+    }
+
     public void kakaoLogin(PluginCall call) {
+        // 응답은 iOS 와 같은 KakaoLoginResult(accessToken·idToken·refreshToken)다. 토큰은 로그에 남기지 않는다.
+        Function2<OAuthToken, Throwable, Unit> handleResult = (oAuthToken, error) -> {
+            if (error != null) {
+                Log.e(TAG, "로그인 실패", error);
+                // 사용자 취소는 코드로 구분한다 — JS 는 문구가 아니라 code 로 취소를 식별한다(iOS 와 같은 계약).
+                String code = isUserCancellation(error) ? "SIGN_IN_CANCELLED" : null;
+                call.reject(error.toString(), code, error instanceof Exception ? (Exception) error : null);
+            } else if (oAuthToken != null) {
+                JSObject ret = new JSObject();
+                ret.put("accessToken", oAuthToken.getAccessToken());
+                ret.put("idToken", oAuthToken.getIdToken() != null ? oAuthToken.getIdToken() : "");
+                ret.put("refreshToken", oAuthToken.getRefreshToken());
+                call.resolve(ret);
+            } else {
+                call.reject("no_data");
+            }
+            return null;
+        };
+
         if (UserApiClient.getInstance().isKakaoTalkLoginAvailable(this.activity)) {
-            UserApiClient
-                    .getInstance()
-                    .loginWithKakaoTalk(
-                            this.activity,
-                            (oAuthToken, error) -> {
-                                if (error != null) {
-                                    Log.e(TAG, "로그인 실패", error);
-                                    call.reject(error.toString());
-                                } else if (oAuthToken != null) {
-                                    Log.i(TAG, "로그인 성공(토큰) : " + oAuthToken.getAccessToken());
-                                    JSObject ret = new JSObject();
-                                    ret.put("value", oAuthToken.getAccessToken());
-                                    call.resolve(ret);
-                                } else {
-                                    call.reject("no_data");
-                                }
-                                return null;
-                            }
-                    );
+            UserApiClient.getInstance().loginWithKakaoTalk(this.activity, handleResult);
         } else {
-            UserApiClient
-                    .getInstance()
-                    .loginWithKakaoAccount(
-                            this.activity,
-                            (oAuthToken, error) -> {
-                                if (error != null) {
-                                    Log.e(TAG, "로그인 실패", error);
-                                    call.reject(error.toString());
-                                } else if (oAuthToken != null) {
-                                    Log.i(TAG, "로그인 성공(토큰) : " + oAuthToken.getAccessToken());
-                                    JSObject ret = new JSObject();
-                                    ret.put("value", oAuthToken.getAccessToken());
-                                    call.resolve(ret);
-                                } else {
-                                    call.reject("no_data");
-                                }
-                                return null;
-                            }
-                    );
+            UserApiClient.getInstance().loginWithKakaoAccount(this.activity, handleResult);
         }
     }
 
